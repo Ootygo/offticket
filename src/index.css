@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-primary: #1B4332;
+  --color-primary-dark: #123024;
+  --color-primary-light: #2D6A4F;
+  --color-accent: #F59E0B;
+  --color-accent-dark: #D97706;
+  --color-bg-app: #F9FAFB;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-app);
+}
+
+/* Hero background traffic animation — CSS-driven "moving vehicles" effect,
+   used instead of a video file so the hero loads instantly. */
+@keyframes ot-drive-right {
+  from { transform: translateX(-180px); }
+  to { transform: translateX(1620px); }
+}
+@keyframes ot-drive-left {
+  from { transform: translateX(1620px) scaleX(-1); }
+  to { transform: translateX(-180px) scaleX(-1); }
+}
+@keyframes ot-cloud-drift {
+  from { transform: translateX(-120px); }
+  to { transform: translateX(1560px); }
+}
+@keyframes ot-road-flow {
+  to { stroke-dashoffset: -280; }
+}
+
+.animate-ot-drive-right { animation-name: ot-drive-right; animation-timing-function: linear; animation-iteration-count: infinite; }
+.animate-ot-drive-left { animation-name: ot-drive-left; animation-timing-function: linear; animation-iteration-count: infinite; }
+.animate-ot-cloud-drift { animation-name: ot-cloud-drift; animation-timing-function: linear; animation-iteration-count: infinite; }
+.animate-ot-road-flow { animation: ot-road-flow 2.2s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ot-drive-right,
+  .animate-ot-drive-left,
+  .animate-ot-cloud-drift,
+  .animate-ot-road-flow {
+    animation: none;
+  }
+}

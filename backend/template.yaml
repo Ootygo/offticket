@@ -1,0 +1,417 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  OFFTICKET backend — API Gateway (HTTP API) + Lambda (Node.js) + DynamoDB +
+  Cognito (separate customer/owner pools) + S3 for vehicle photos.
+
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Description: CORS origin for the frontend (e.g. https://main.xxxxx.amplifyapp.com)
+    Default: "*"
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 10
+    MemorySize: 256
+    Environment:
+      Variables:
+        USERS_TABLE: !Ref UsersTable
+        VEHICLES_TABLE: !Ref VehiclesTable
+        LISTINGS_TABLE: !Ref ListingsTable
+        BOOKINGS_TABLE: !Ref BookingsTable
+        PHOTOS_BUCKET: !Ref VehiclePhotosBucket
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
+
+Resources:
+
+  ########################
+  # DynamoDB Tables
+  ########################
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub offticket-users-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  VehiclesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub offticket-vehicles-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: vehicleId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: vehicleId
+          KeyType: HASH
+
+  ListingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub offticket-listings-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: listingId
+          AttributeType: S
+        - AttributeName: routeKey
+          AttributeType: S
+        - AttributeName: departureDate
+          AttributeType: S
+        - AttributeName: ownerId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: listingId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: RouteIndex
+          KeySchema:
+            - AttributeName: routeKey
+              KeyType: HASH
+            - AttributeName: departureDate
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: OwnerListingsIndex
+          KeySchema:
+            - AttributeName: ownerId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  BookingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub offticket-bookings-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: bookingId
+          AttributeType: S
+        - AttributeName: customerId
+          AttributeType: S
+        - AttributeName: ownerId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: bookingId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: CustomerBookingsIndex
+          KeySchema:
+            - AttributeName: customerId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: OwnerBookingsIndex
+          KeySchema:
+            - AttributeName: ownerId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  ########################
+  # S3 — vehicle photos & documents
+  ########################
+
+  VehiclePhotosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub offticket-vehicle-photos-${Stage}-${AWS::AccountId}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref AllowedOrigin]
+            AllowedMethods: [GET, PUT]
+            AllowedHeaders: ['*']
+            MaxAge: 3000
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ########################
+  # Cognito — separate pools for owners and customers
+  ########################
+
+  # Phone-number auto-verification requires Cognito to be able to send SMS
+  # OTPs, which requires this SNS-publish role. Note: new AWS accounts start
+  # in the SNS SMS sandbox, which only delivers to verified numbers — move
+  # out of the sandbox in the SNS console before relying on this for real users.
+  CognitoSmsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub offticket-cognito-sms-${Stage}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cognito-idp.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Sub offticket-cognito-sms-${Stage}
+      Policies:
+        - PolicyName: CognitoSNSPublish
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: '*'
+
+  CustomerUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub offticket-customers-${Stage}
+      AutoVerifiedAttributes: [phone_number]
+      UsernameAttributes: [phone_number]
+      SmsConfiguration:
+        SnsCallerArn: !GetAtt CognitoSmsRole.Arn
+        ExternalId: !Sub offticket-cognito-sms-${Stage}
+      Schema:
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+
+  CustomerUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub offticket-customers-web-${Stage}
+      UserPoolId: !Ref CustomerUserPool
+      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      GenerateSecret: false
+
+  OwnerUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub offticket-owners-${Stage}
+      AutoVerifiedAttributes: [phone_number]
+      UsernameAttributes: [phone_number]
+      SmsConfiguration:
+        SnsCallerArn: !GetAtt CognitoSmsRole.Arn
+        ExternalId: !Sub offticket-cognito-sms-${Stage}
+      Schema:
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+
+  OwnerUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub offticket-owners-web-${Stage}
+      UserPoolId: !Ref OwnerUserPool
+      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      GenerateSecret: false
+
+  ########################
+  # API Gateway (HTTP API) with per-pool JWT authorizers
+  ########################
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins: [!Ref AllowedOrigin]
+        AllowHeaders: [Content-Type, Authorization]
+        AllowMethods: [GET, POST, PUT, OPTIONS]
+      Auth:
+        Authorizers:
+          CustomerAuthorizer:
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${CustomerUserPool}
+              audience: [!Ref CustomerUserPoolClient]
+            IdentitySource: $request.header.Authorization
+          OwnerAuthorizer:
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${OwnerUserPool}
+              audience: [!Ref OwnerUserPoolClient]
+            IdentitySource: $request.header.Authorization
+
+  ########################
+  # Lambda functions
+  ########################
+
+  SearchListingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/listings/search.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref ListingsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /listings
+            Method: GET
+
+  GetListingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/listings/getOne.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref ListingsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /listings/{id}
+            Method: GET
+
+  CreateListingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/listings/create.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref ListingsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref VehiclesTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /listings
+            Method: POST
+            Auth:
+              Authorizer: OwnerAuthorizer
+
+  CreateBookingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/bookings/create.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref BookingsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ListingsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /bookings
+            Method: POST
+            Auth:
+              Authorizer: CustomerAuthorizer
+
+  ConfirmBookingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/bookings/confirm.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref BookingsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /bookings/{id}/confirm
+            Method: PUT
+            Auth:
+              Authorizer: OwnerAuthorizer
+
+  GetUserBookingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/users/getBookings.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref BookingsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /users/{id}/bookings
+            Method: GET
+
+  GetUserListingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/users/getListings.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref ListingsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /users/{id}/listings
+            Method: GET
+
+  GetStatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/stats/get.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref BookingsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /stats
+            Method: GET
+
+  PresignUploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/uploads/presign.handler
+      Policies:
+        - S3CrudPolicy: { BucketName: !Ref VehiclePhotosBucket }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /uploads/presign
+            Method: POST
+            Auth:
+              Authorizer: OwnerAuthorizer
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the HTTP API
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+  CustomerUserPoolId:
+    Value: !Ref CustomerUserPool
+  CustomerUserPoolClientId:
+    Value: !Ref CustomerUserPoolClient
+  OwnerUserPoolId:
+    Value: !Ref OwnerUserPool
+  OwnerUserPoolClientId:
+    Value: !Ref OwnerUserPoolClient
+  VehiclePhotosBucketName:
+    Value: !Ref VehiclePhotosBucket

@@ -1,0 +1,98 @@
+import { useEffect, useState } from 'react'
+import Card from '../../components/ui/Card'
+import Badge from '../../components/ui/Badge'
+import { getUserBookings } from '../../lib/api'
+import { mockListings, CITIES } from '../../data/mockData'
+import { useAuth } from '../../context/AuthContext'
+import { useRequireUser } from '../../hooks/useRequireUser'
+
+const statusVariant = { pending: 'warning', confirmed: 'primary', completed: 'success' }
+
+export default function CustomerDashboard() {
+  const { token } = useAuth()
+  const user = useRequireUser('customer')
+  const [bookings, setBookings] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) return
+    getUserBookings(user.userId, token).then(setBookings).finally(() => setLoading(false))
+  }, [user, token])
+
+  const active = bookings.filter((b) => b.status !== 'completed')
+  const past = bookings.filter((b) => b.status === 'completed')
+  const savedRoutes = [
+    { from: 'Coimbatore', to: 'Ooty' },
+    { from: 'Ooty', to: 'Coimbatore' },
+  ]
+
+  function listingFor(b) {
+    return mockListings.find((l) => l.listingId === b.listingId)
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900">My Bookings</h1>
+      <p className="mt-1 text-sm text-gray-500">Welcome back{user ? `, ${user.name.split(' ')[0]}` : ''}</p>
+
+      <section className="mt-8">
+        <h2 className="font-semibold text-gray-900">Active bookings</h2>
+        {loading && <p className="mt-2 text-sm text-gray-500">Loading...</p>}
+        {!loading && active.length === 0 && (
+          <Card className="mt-3 p-6 text-center text-sm text-gray-500">No active bookings yet.</Card>
+        )}
+        <div className="mt-3 space-y-3">
+          {active.map((b) => {
+            const l = listingFor(b)
+            return (
+              <Card key={b.bookingId} className="flex items-center justify-between p-4">
+                <div>
+                  <p className="font-mono text-sm text-gray-500">{b.bookingId}</p>
+                  <p className="font-medium text-gray-900">{l ? `${l.fromCity} → ${l.toCity}` : 'Route unavailable'}</p>
+                  {l && <p className="text-sm text-gray-500">{l.departureDate} at {l.departureTime}</p>}
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-gray-900">₹{b.totalPrice}</p>
+                  <Badge variant={statusVariant[b.status] || 'neutral'}>{b.status}</Badge>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="font-semibold text-gray-900">Past trips</h2>
+        {!loading && past.length === 0 && (
+          <Card className="mt-3 p-6 text-center text-sm text-gray-500">No completed trips yet.</Card>
+        )}
+        <div className="mt-3 space-y-3">
+          {past.map((b) => {
+            const l = listingFor(b)
+            return (
+              <Card key={b.bookingId} className="flex items-center justify-between p-4">
+                <div>
+                  <p className="font-mono text-sm text-gray-500">{b.bookingId}</p>
+                  <p className="font-medium text-gray-900">{l ? `${l.fromCity} → ${l.toCity}` : 'Route unavailable'}</p>
+                </div>
+                <Badge variant="success">completed</Badge>
+              </Card>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="font-semibold text-gray-900">Saved routes</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {savedRoutes.map((r) => (
+            <Card key={`${r.from}-${r.to}`} className="p-4">
+              <p className="font-medium text-gray-900">{r.from} → {r.to}</p>
+              <p className="text-xs text-gray-500">{CITIES.includes(r.from) ? 'Frequent route' : ''}</p>
+            </Card>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
