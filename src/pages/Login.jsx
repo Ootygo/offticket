@@ -13,7 +13,7 @@ export default function Login() {
 
   const [userType, setUserType] = useState(params.get('as') === 'owner' ? 'owner' : 'customer')
   const [mode, setMode] = useState(MODES.SIGN_IN)
-  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
@@ -29,7 +29,7 @@ export default function Login() {
     setError('')
     setSubmitting(true)
     try {
-      await login(userType, { phone, password })
+      await login(userType, { email, password })
       goToDashboard()
     } catch (err) {
       setError(err.message || 'Could not sign in')
@@ -43,7 +43,7 @@ export default function Login() {
     setError('')
     setSubmitting(true)
     try {
-      await signup(userType, { phone, password, name })
+      await signup(userType, { email, password, name })
       if (useCognito) {
         setMode(MODES.CONFIRM)
       } else {
@@ -61,8 +61,8 @@ export default function Login() {
     setError('')
     setSubmitting(true)
     try {
-      await confirmSignup(userType, { phone, code })
-      await login(userType, { phone, password })
+      await confirmSignup(userType, { email, code })
+      await login(userType, { email, password })
       goToDashboard()
     } catch (err) {
       setError(err.message || 'Could not verify code')
@@ -75,12 +75,12 @@ export default function Login() {
     <div className="mx-auto max-w-md px-4 py-16">
       <Card className="p-8">
         <h1 className="text-2xl font-bold text-gray-900">
-          {mode === MODES.SIGN_UP ? 'Create your account' : mode === MODES.CONFIRM ? 'Verify your number' : 'Log in to OFFTICKET'}
+          {mode === MODES.SIGN_UP ? 'Create your account' : mode === MODES.CONFIRM ? 'Verify your email' : 'Log in to OFFTICKET'}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           {useCognito
             ? 'Secured by AWS Cognito'
-            : 'Demo login — connect Cognito env vars for real OTP verification.'}
+            : 'Demo login — connect Cognito env vars for real email verification.'}
         </p>
 
         {mode !== MODES.CONFIRM && (
@@ -105,8 +105,8 @@ export default function Login() {
         {mode === MODES.SIGN_IN && (
           <form onSubmit={handleSignIn} className="mt-6 space-y-4">
             <label className="block text-sm text-gray-700">
-              Mobile number
-              <input required type="tel" placeholder="10-digit mobile number" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" />
+              Email address
+              <input required type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" />
             </label>
             {useCognito && (
               <label className="block text-sm text-gray-700">
@@ -132,8 +132,8 @@ export default function Login() {
               <input required value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" />
             </label>
             <label className="block text-sm text-gray-700">
-              Mobile number
-              <input required type="tel" placeholder="10-digit mobile number" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" />
+              Email address
+              <input required type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" />
             </label>
             <label className="block text-sm text-gray-700">
               Password
@@ -150,7 +150,7 @@ export default function Login() {
 
         {mode === MODES.CONFIRM && (
           <form onSubmit={handleConfirm} className="mt-6 space-y-4">
-            <p className="text-sm text-gray-600">Enter the verification code sent to {phone}</p>
+            <p className="text-sm text-gray-600">Enter the verification code sent to {email}</p>
             <label className="block text-sm text-gray-700">
               Verification code
               <input required value={code} onChange={(e) => setCode(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" />

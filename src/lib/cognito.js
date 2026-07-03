@@ -36,29 +36,23 @@ function getPool(userType) {
   return new CognitoUserPool(config)
 }
 
-function toPhoneUsername(phone) {
-  // Cognito usernames configured as phone_number expect E.164 format.
-  return phone.startsWith('+') ? phone : `+91${phone}`
-}
-
-export function signUp(userType, { phone, password, name }) {
+export function signUp(userType, { email, password, name }) {
   const pool = getPool(userType)
-  const username = toPhoneUsername(phone)
   const attributes = [
     new CognitoUserAttribute({ Name: 'name', Value: name }),
-    new CognitoUserAttribute({ Name: 'phone_number', Value: username }),
+    new CognitoUserAttribute({ Name: 'email', Value: email }),
   ]
   return new Promise((resolve, reject) => {
-    pool.signUp(username, password, attributes, null, (err, result) => {
+    pool.signUp(email, password, attributes, null, (err, result) => {
       if (err) reject(err)
       else resolve(result)
     })
   })
 }
 
-export function confirmSignUp(userType, { phone, code }) {
+export function confirmSignUp(userType, { email, code }) {
   const pool = getPool(userType)
-  const user = new CognitoUser({ Username: toPhoneUsername(phone), Pool: pool })
+  const user = new CognitoUser({ Username: email, Pool: pool })
   return new Promise((resolve, reject) => {
     user.confirmRegistration(code, true, (err, result) => {
       if (err) reject(err)
@@ -67,11 +61,10 @@ export function confirmSignUp(userType, { phone, code }) {
   })
 }
 
-export function signIn(userType, { phone, password }) {
+export function signIn(userType, { email, password }) {
   const pool = getPool(userType)
-  const username = toPhoneUsername(phone)
-  const user = new CognitoUser({ Username: username, Pool: pool })
-  const authDetails = new AuthenticationDetails({ Username: username, Password: password })
+  const user = new CognitoUser({ Username: email, Pool: pool })
+  const authDetails = new AuthenticationDetails({ Username: email, Password: password })
 
   return new Promise((resolve, reject) => {
     user.authenticateUser(authDetails, {

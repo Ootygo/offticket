@@ -152,78 +152,50 @@ Resources:
 
   ########################
   # Cognito — separate pools for owners and customers
+  # Email-based sign-in/verification — Cognito sends verification codes via
+  # its own default email sender, no SNS/SMS setup required.
   ########################
 
-  # Phone-number auto-verification requires Cognito to be able to send SMS
-  # OTPs, which requires this SNS-publish role. Note: new AWS accounts start
-  # in the SNS SMS sandbox, which only delivers to verified numbers — move
-  # out of the sandbox in the SNS console before relying on this for real users.
-  CognitoSmsRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub offticket-cognito-sms-${Stage}
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: cognito-idp.amazonaws.com
-            Action: sts:AssumeRole
-            Condition:
-              StringEquals:
-                sts:ExternalId: !Sub offticket-cognito-sms-${Stage}
-      Policies:
-        - PolicyName: CognitoSNSPublish
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action: sns:Publish
-                Resource: '*'
-
-  CustomerUserPool:
+  # Logical IDs suffixed V2: UsernameAttributes is immutable on
+  # AWS::Cognito::UserPool, so switching from phone_number to email requires
+  # brand-new pools (new logical IDs) rather than an in-place update.
+  CustomerUserPoolV2:
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: !Sub offticket-customers-${Stage}
-      AutoVerifiedAttributes: [phone_number]
-      UsernameAttributes: [phone_number]
-      SmsConfiguration:
-        SnsCallerArn: !GetAtt CognitoSmsRole.Arn
-        ExternalId: !Sub offticket-cognito-sms-${Stage}
+      AutoVerifiedAttributes: [email]
+      UsernameAttributes: [email]
       Schema:
         - Name: name
           AttributeDataType: String
           Mutable: true
           Required: true
 
-  CustomerUserPoolClient:
+  CustomerUserPoolClientV2:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       ClientName: !Sub offticket-customers-web-${Stage}
-      UserPoolId: !Ref CustomerUserPool
+      UserPoolId: !Ref CustomerUserPoolV2
       ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
       GenerateSecret: false
 
-  OwnerUserPool:
+  OwnerUserPoolV2:
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: !Sub offticket-owners-${Stage}
-      AutoVerifiedAttributes: [phone_number]
-      UsernameAttributes: [phone_number]
-      SmsConfiguration:
-        SnsCallerArn: !GetAtt CognitoSmsRole.Arn
-        ExternalId: !Sub offticket-cognito-sms-${Stage}
+      AutoVerifiedAttributes: [email]
+      UsernameAttributes: [email]
       Schema:
         - Name: name
           AttributeDataType: String
           Mutable: true
           Required: true
 
-  OwnerUserPoolClient:
+  OwnerUserPoolClientV2:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       ClientName: !Sub offticket-owners-web-${Stage}
-      UserPoolId: !Ref OwnerUserPool
+      UserPoolId: !Ref OwnerUserPoolV2
       ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
       GenerateSecret: false
 
@@ -243,13 +215,13 @@ Resources:
         Authorizers:
           CustomerAuthorizer:
             JwtConfiguration:
-              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${CustomerUserPool}
-              audience: [!Ref CustomerUserPoolClient]
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${CustomerUserPoolV2}
+              audience: [!Ref CustomerUserPoolClientV2]
             IdentitySource: $request.header.Authorization
           OwnerAuthorizer:
             JwtConfiguration:
-              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${OwnerUserPool}
-              audience: [!Ref OwnerUserPoolClient]
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${OwnerUserPoolV2}
+              audience: [!Ref OwnerUserPoolClientV2]
             IdentitySource: $request.header.Authorization
 
   ########################
@@ -406,12 +378,12 @@ Outputs:
     Description: Base URL for the HTTP API
     Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
   CustomerUserPoolId:
-    Value: !Ref CustomerUserPool
+    Value: !Ref CustomerUserPoolV2
   CustomerUserPoolClientId:
-    Value: !Ref CustomerUserPoolClient
+    Value: !Ref CustomerUserPoolClientV2
   OwnerUserPoolId:
-    Value: !Ref OwnerUserPool
+    Value: !Ref OwnerUserPoolV2
   OwnerUserPoolClientId:
-    Value: !Ref OwnerUserPoolClient
+    Value: !Ref OwnerUserPoolClientV2
   VehiclePhotosBucketName:
     Value: !Ref VehiclePhotosBucket

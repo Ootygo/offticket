@@ -87,11 +87,10 @@ aws cloudformation deploy \
   --template-file packaged.yaml \
   --stack-name offticket-backend-dev \
   --region ap-south-1 \
-  --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+  --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
   --parameter-overrides AllowedOrigin="*" Stage=dev
 ```
-`CAPABILITY_NAMED_IAM` is required because the Cognito SMS role has an
-explicit name; `CAPABILITY_AUTO_EXPAND` because the template uses the SAM
+`CAPABILITY_AUTO_EXPAND` is required because the template uses the SAM
 transform. Set `AllowedOrigin` to your real frontend URL once it's live
 instead of `*`.
 
@@ -100,14 +99,9 @@ Either way, this provisions:
   GSIs needed for route search, "my listings", and "my bookings" queries
 - 9 Lambda functions behind an HTTP API (see table below)
 - 2 Cognito User Pools (`offticket-customers-*`, `offticket-owners-*`) with
-  phone-number sign-in, plus the IAM role Cognito needs to send SMS OTPs
+  email-based sign-in — Cognito sends verification codes via its own
+  default email sender, no SNS/SES setup needed
 - An S3 bucket for vehicle photos, with presigned-upload support
-
-**Important — SNS SMS sandbox:** phone-number sign-up sends OTPs via SNS.
-New AWS accounts start in the SNS **SMS sandbox**, which only delivers to
-phone numbers you've pre-verified in the SNS console (Text messaging (SMS)
-→ Sandbox destination phone numbers). Move the account out of the sandbox
-(SNS console → request production access) before real users can sign up.
 
 After deploy, copy the stack `Outputs` (`ApiUrl`, `CustomerUserPoolId`,
 `CustomerUserPoolClientId`, `OwnerUserPoolId`, `OwnerUserPoolClientId`) —

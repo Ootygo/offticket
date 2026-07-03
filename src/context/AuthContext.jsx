@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
     return {
       userId: claims.sub,
       name: claims.name || 'User',
-      phone: claims.phone_number,
+      email: claims.email,
       userType,
     }
   }
