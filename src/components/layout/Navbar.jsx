@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Button from '../ui/Button'
+import InstallAppButton from '../InstallAppButton'
 
 const navLinkClass = ({ isActive }) =>
   `text-sm font-medium transition-colors ${isActive ? 'text-primary' : 'text-gray-600 hover:text-primary'}`
@@ -33,6 +34,7 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
+          <InstallAppButton />
           {user ? (
             <>
               <span className="text-sm text-gray-500">Hi, {user.name.split(' ')[0]}</span>
@@ -62,12 +64,13 @@ export default function Navbar() {
           <NavLink to="/about" className={navLinkClass} onClick={() => setOpen(false)}>About</NavLink>
           {user?.userType === 'customer' && <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>My Bookings</NavLink>}
           {user?.userType === 'owner' && <NavLink to="/owner/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>My Vehicles</NavLink>}
-          <div className="mt-2 flex gap-2 border-t border-gray-100 pt-3">
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
             {user ? (
               <Button variant="ghost" size="sm" onClick={handleLogout}>Log out</Button>
             ) : (
               <Button as={Link} to="/login" variant="primary" size="sm" onClick={() => setOpen(false)}>Log in / Sign up</Button>
             )}
+            <InstallAppButton />
           </div>
         </nav>
       )}

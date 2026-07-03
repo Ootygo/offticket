@@ -14,6 +14,7 @@ passengers at discounted prices. Launch corridor: Coimbatore ↔ Ooty, India.
 | Auth      | AWS Cognito — separate user pools for vehicle owners and customers |
 | Storage   | AWS S3 (vehicle photos, via presigned upload URLs) |
 | Hosting   | AWS Amplify (frontend) + API Gateway (backend, deployed with SAM) |
+| PWA       | `vite-plugin-pwa` — installable on desktop/mobile, offline-capable shell |
 
 ## Project structure
 
@@ -161,6 +162,27 @@ API and Cognito pools instead of mock data.
    Environment variables**.
 5. Once deployed, update the backend's `AllowedOrigin` parameter to the
    Amplify domain and re-run `sam deploy` so CORS allows it.
+
+## PWA (installable app)
+
+The frontend is a Progressive Web App via `vite-plugin-pwa` (see
+`VitePWA(...)` in `vite.config.js`) — installable on desktop (Chrome/Edge)
+and mobile (Android Chrome, iOS Safari), with an offline-capable app shell.
+
+- **Manifest & icons**: `public/icons/` (192/512/maskable PNGs, generated
+  from the `design-assets/icon-source*.svg` masters) plus `favicon.svg` /
+  `favicon-32.png`. Regenerate with any SVG-to-PNG tool if the icon changes.
+- **Install button**: `src/hooks/useInstallPrompt.js` wraps the
+  `beforeinstallprompt` browser event; `src/components/InstallAppButton.jsx`
+  renders an "Install App" button in the Navbar when installable, or
+  "Add to Home Screen" instructions on iOS (which never fires that event).
+- **Service worker**: auto-generated (`registerType: 'autoUpdate'`), so
+  updates apply on next load with no manual cache-busting needed.
+
+Test the real install flow with `npm run build && npm run preview` (or on
+the deployed Amplify site) — the plugin also works in `npm run dev` via
+`devOptions.enabled: true`, but Chrome's install eligibility heuristics are
+more reliable against a production build.
 
 ## Known limitations / next steps
 
