@@ -14,7 +14,7 @@ export default defineConfig({
       manifest: {
         name: 'OFFTICKET — Empty vehicles, full savings',
         short_name: 'OFFTICKET',
-        description: 'Book discounted empty return-trip vehicles on the Coimbatore-Ooty corridor, or list your own.',
+        description: 'Book discounted empty return-trip vehicles anywhere in Tamil Nadu, or list your own.',
         theme_color: '#1B4332',
         background_color: '#F9FAFB',
         display: 'standalone',

@@ -8,14 +8,18 @@ import { getStats } from '../lib/api'
 import { correctCityName } from '../lib/format'
 
 const routes = [
+  { from: 'Chennai', to: 'Coimbatore', tamil: 'சென்னை → கோயம்புத்தூர்' },
+  { from: 'Chennai', to: 'Madurai', tamil: 'சென்னை → மதுரை' },
   { from: 'Coimbatore', to: 'Ooty', tamil: 'கோயம்புத்தூர் → ஊட்டி' },
-  { from: 'Ooty', to: 'Coimbatore', tamil: 'ஊட்டி → கோயம்புத்தூர்' },
+  { from: 'Coimbatore', to: 'Salem', tamil: 'கோயம்புத்தூர் → சேலம்' },
+  { from: 'Madurai', to: 'Tiruchirappalli', tamil: 'மதுரை → திருச்சிராப்பள்ளி' },
+  { from: 'Chennai', to: 'Tiruchirappalli', tamil: 'சென்னை → திருச்சிராப்பள்ளி' },
 ]
 
 export default function Home() {
   const navigate = useNavigate()
-  const [from, setFrom] = useState('Coimbatore')
-  const [to, setTo] = useState('Ooty')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [stats, setStats] = useState(null)
 
   useEffect(() => {
@@ -40,7 +44,7 @@ export default function Home() {
               Empty vehicles, full savings.
             </h1>
             <p className="mt-4 text-lg text-white/80">
-              Trucks and cabs returning empty from Ooty to Coimbatore (and back) at 40–50% off.
+              Trucks and cabs returning empty on routes all across Tamil Nadu at 40–50% off.
               Book the return leg, save the difference.
             </p>
 
@@ -55,7 +59,7 @@ export default function Home() {
           {/* Quick search */}
           <Card className="mt-10 max-w-xl bg-white/95 p-4">
             <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <RouteInputs from={from} to={to} onFromChange={setFrom} onToChange={setTo} className="flex-1 text-left text-gray-900" />
+              <RouteInputs from={from} to={to} onFromChange={setFrom} onToChange={setTo} required className="flex-1 text-left text-gray-900" />
               <Button type="submit" variant="primary">Search</Button>
             </form>
           </Card>
@@ -121,10 +125,13 @@ export default function Home() {
       {/* Active routes */}
       <section className="bg-white py-16">
         <div className="mx-auto max-w-6xl px-4">
-          <h2 className="text-center text-2xl font-bold text-gray-900 sm:text-3xl">Active Routes</h2>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <h2 className="text-center text-2xl font-bold text-gray-900 sm:text-3xl">Popular Routes Across Tamil Nadu</h2>
+          <p className="mt-2 text-center text-sm text-gray-500">
+            These are just a few — search any city or town in Tamil Nadu, not only these.
+          </p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {routes.map((r) => (
-              <Card key={r.from} className="flex items-center justify-between p-5">
+              <Card key={`${r.from}-${r.to}`} className="flex items-center justify-between p-5">
                 <div>
                   <p className="font-semibold text-gray-900">{r.from} → {r.to}</p>
                   <p className="text-sm text-gray-500">{r.tamil}</p>

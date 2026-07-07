@@ -2,7 +2,8 @@
 
 Marketplace that matches empty return-trip commercial vehicles (trucks,
 mini-trucks, pickups, cabs) with customers who need to move goods or
-passengers at discounted prices. Launch corridor: Coimbatore ↔ Ooty, India.
+passengers at discounted prices, on any route across Tamil Nadu, India —
+Chennai, Coimbatore, Madurai, Trichy, Salem, the Nilgiris, and beyond.
 
 ## Tech stack
 

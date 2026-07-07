@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
+import Button from '../../components/ui/Button'
 import { getUserBookings } from '../../lib/api'
-import { mockListings, CITIES } from '../../data/mockData'
+import { mockListings } from '../../data/mockData'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireUser } from '../../hooks/useRequireUser'
 
@@ -21,14 +23,22 @@ export default function CustomerDashboard() {
 
   const active = bookings.filter((b) => b.status !== 'completed')
   const past = bookings.filter((b) => b.status === 'completed')
-  const savedRoutes = [
-    { from: 'Coimbatore', to: 'Ooty' },
-    { from: 'Ooty', to: 'Coimbatore' },
-  ]
 
   function listingFor(b) {
     return mockListings.find((l) => l.listingId === b.listingId)
   }
+
+  // Routes this customer has actually booked before, not a fixed corridor —
+  // OFFTICKET covers all of Tamil Nadu, so "frequent routes" has to come
+  // from the customer's own history rather than a hardcoded pair.
+  const savedRoutes = Array.from(
+    new Map(
+      bookings
+        .map(listingFor)
+        .filter(Boolean)
+        .map((l) => [`${l.fromCity}-${l.toCity}`, { from: l.fromCity, to: l.toCity }])
+    ).values()
+  )
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -83,15 +93,21 @@ export default function CustomerDashboard() {
       </section>
 
       <section className="mt-8">
-        <h2 className="font-semibold text-gray-900">Saved routes</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {savedRoutes.map((r) => (
-            <Card key={`${r.from}-${r.to}`} className="p-4">
-              <p className="font-medium text-gray-900">{r.from} → {r.to}</p>
-              <p className="text-xs text-gray-500">{CITIES.includes(r.from) ? 'Frequent route' : ''}</p>
-            </Card>
-          ))}
-        </div>
+        <h2 className="font-semibold text-gray-900">Your routes</h2>
+        {savedRoutes.length === 0 ? (
+          <Card className="mt-3 p-6 text-center text-sm text-gray-500">
+            Routes you've booked before will show up here for quick re-search.
+          </Card>
+        ) : (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {savedRoutes.map((r) => (
+              <Card key={`${r.from}-${r.to}`} className="flex items-center justify-between p-4">
+                <p className="font-medium text-gray-900">{r.from} → {r.to}</p>
+                <Button as={Link} to={`/search?from=${r.from}&to=${r.to}`} variant="outline" size="sm">Search again</Button>
+              </Card>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

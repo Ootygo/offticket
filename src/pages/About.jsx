@@ -18,10 +18,11 @@ export default function About() {
       <section className="mt-8">
         <h2 className="text-xl font-semibold text-primary">Our Mission</h2>
         <p className="mt-2 text-gray-600">
-          Every day, hundreds of trucks and cabs travel from Coimbatore to Ooty (and back) fully loaded one way
-          and completely empty on the return. OFFTICKET connects those empty return trips with customers who
-          need to move goods or themselves — cutting costs for everyone, reducing the number of extra vehicles
-          on the road, and lowering emissions along the Nilgiris corridor.
+          Every day, thousands of trucks and cabs travel across Tamil Nadu — from Chennai to Coimbatore, Madurai
+          to Trichy, Coimbatore up to Ooty, and everywhere in between — fully loaded one way and completely
+          empty on the return. OFFTICKET connects those empty return trips with customers who need to move
+          goods or themselves, on any route in the state — cutting costs for everyone, reducing the number of
+          extra vehicles on the road, and lowering emissions.
         </p>
       </section>
 

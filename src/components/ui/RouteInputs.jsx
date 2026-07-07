@@ -1,7 +1,7 @@
 import CityInput from './CityInput'
 
 // Paired From/To city inputs with an instant swap button between them.
-export default function RouteInputs({ from, to, onFromChange, onToChange, className = '' }) {
+export default function RouteInputs({ from, to, onFromChange, onToChange, required = false, className = '' }) {
   function handleSwap() {
     onFromChange(to)
     onToChange(from)
@@ -9,7 +9,7 @@ export default function RouteInputs({ from, to, onFromChange, onToChange, classN
 
   return (
     <div className={`relative flex flex-col gap-3 sm:flex-row sm:items-end ${className}`}>
-      <CityInput label="From" value={from} onChange={onFromChange} className="flex-1" />
+      <CityInput label="From" value={from} onChange={onFromChange} required={required} className="flex-1" />
 
       <button
         type="button"
@@ -22,7 +22,7 @@ export default function RouteInputs({ from, to, onFromChange, onToChange, classN
         <span className="hidden sm:inline">⇄</span>
       </button>
 
-      <CityInput label="To" value={to} onChange={onToChange} className="flex-1" />
+      <CityInput label="To" value={to} onChange={onToChange} required={required} className="flex-1" />
     </div>
   )
 }

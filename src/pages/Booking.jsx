@@ -4,7 +4,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import EpassBanner from '../components/EpassBanner'
-import { VEHICLE_TYPES } from '../data/mockData'
+import { VEHICLE_TYPES, isNilgirisRoute } from '../data/mockData'
 import { getListing, createBooking } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { useRequireUser } from '../hooks/useRequireUser'
@@ -37,6 +37,7 @@ export default function Booking() {
   const typeLabel = VEHICLE_TYPES.find((t) => t.value === listing.vehicleType)?.label || listing.vehicleType
   const savings = listing.normalPrice - listing.pricePerUnit
   const savingsPct = Math.round((savings / listing.normalPrice) * 100)
+  const needsEpass = isNilgirisRoute(listing.fromCity, listing.toCity)
 
   async function handleConfirm() {
     if (!user) return
@@ -124,9 +125,11 @@ export default function Booking() {
           </div>
         </div>
 
-        <div className="mt-6">
-          <EpassBanner />
-        </div>
+        {needsEpass && (
+          <div className="mt-6">
+            <EpassBanner />
+          </div>
+        )}
 
         <Button
           onClick={handleConfirm}

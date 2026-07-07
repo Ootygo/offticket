@@ -4,7 +4,7 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import RouteInputs from '../../components/ui/RouteInputs'
-import { VEHICLE_TYPES } from '../../data/mockData'
+import { VEHICLE_TYPES, isNilgirisRoute } from '../../data/mockData'
 import { createListing } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireUser } from '../../hooks/useRequireUser'
@@ -14,8 +14,8 @@ const initialForm = {
   vehicleType: 'mini_truck',
   registrationNumber: '',
   capacity: '',
-  fromCity: 'Coimbatore',
-  toCity: 'Ooty',
+  fromCity: '',
+  toCity: '',
   departureDate: '',
   departureTime: '',
   availableCapacity: '',
@@ -34,6 +34,7 @@ export default function ListVehicle() {
   const [photoPreview, setPhotoPreview] = useState(null)
 
   const isHeavy = form.vehicleType === 'truck'
+  const showNilgirisWarning = isHeavy && isNilgirisRoute(form.fromCity, form.toCity)
   const suggestedMin = form.normalPrice ? Math.round(form.normalPrice * 0.4) : null
   const suggestedMax = form.normalPrice ? Math.round(form.normalPrice * 0.6) : null
 
@@ -116,11 +117,6 @@ export default function ListVehicle() {
                 />
               </label>
             </div>
-            {isHeavy && (
-              <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-                ⚠️ Heavy vehicles are restricted in Ooty from 8 AM–9 PM during peak season. Plan your departure time accordingly.
-              </p>
-            )}
           </div>
 
           <div>
@@ -131,6 +127,7 @@ export default function ListVehicle() {
                 to={form.toCity}
                 onFromChange={(v) => update('fromCity', v)}
                 onToChange={(v) => update('toCity', v)}
+                required
                 className="sm:col-span-2"
               />
               <label className="text-sm text-gray-700">
@@ -152,6 +149,11 @@ export default function ListVehicle() {
                 />
               </label>
             </div>
+            {showNilgirisWarning && (
+              <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                ⚠️ Heavy vehicles are restricted in the Nilgiris (including Ooty) from 8 AM–9 PM during peak season. Plan your departure time accordingly.
+              </p>
+            )}
           </div>
 
           <div>

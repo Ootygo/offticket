@@ -1,7 +1,6 @@
-// Animated Nilgiris hills + highway scene evoking the Coimbatore-Ooty
-// corridor traffic — pure SVG + CSS keyframe animations (no video file), so
-// it loads instantly and stays on-brand. Sits behind the hero copy with a
-// gradient overlay for text contrast.
+// Animated hills + highway traffic scene — pure SVG + CSS keyframe
+// animations (no video file), so it loads instantly and stays on-brand.
+// Sits behind the hero copy with a gradient overlay for text contrast.
 
 const VEHICLE_BODIES = {
   truck: { body: { x: -34, y: -22, w: 46, h: 24 }, cab: { x: 12, y: -14, w: 22, h: 16 }, wheels: [-20, 24] },

@@ -24,9 +24,9 @@ export default function Footer() {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Coverage area</h3>
-            <p className="mt-3 text-sm text-gray-500">Coimbatore ↔ Ooty ↔ Mettupalayam</p>
+            <p className="mt-3 text-sm text-gray-500">All of Tamil Nadu — Chennai, Coimbatore, Madurai, Trichy, Salem, Ooty & more</p>
             <p className="mt-3 text-sm text-gray-500">
-              e-pass required for Nilgiris district entry —{' '}
+              Travelling to/from the Nilgiris (Ooty)? An e-pass is required for district entry —{' '}
               <a href="https://epass.tnega.org" target="_blank" rel="noreferrer" className="text-primary underline">
                 epass.tnega.org
               </a>
@@ -34,7 +34,7 @@ export default function Footer() {
           </div>
         </div>
         <p className="mt-8 border-t border-gray-100 pt-6 text-xs text-gray-400">
-          © {new Date().getFullYear()} OFFTICKET. Built for the Coimbatore–Ooty corridor.
+          © {new Date().getFullYear()} OFFTICKET. Connecting empty-return vehicles across Tamil Nadu.
         </p>
       </div>
     </footer>
