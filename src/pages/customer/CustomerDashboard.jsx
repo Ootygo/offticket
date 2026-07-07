@@ -3,22 +3,30 @@ import { Link } from 'react-router-dom'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import { getUserBookings } from '../../lib/api'
+import { getUserBookings, getUserDemandPosts } from '../../lib/api'
 import { mockListings } from '../../data/mockData'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireUser } from '../../hooks/useRequireUser'
 
 const statusVariant = { pending: 'warning', confirmed: 'primary', completed: 'success' }
+const postStatusVariant = { open: 'warning', awarded: 'success', closed: 'neutral' }
 
 export default function CustomerDashboard() {
   const { token } = useAuth()
   const user = useRequireUser('customer')
   const [bookings, setBookings] = useState([])
+  const [demandPosts, setDemandPosts] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!user) return
-    getUserBookings(user.userId, token).then(setBookings).finally(() => setLoading(false))
+    Promise.all([
+      getUserBookings(user.userId, token),
+      getUserDemandPosts(user.userId, token),
+    ]).then(([b, d]) => {
+      setBookings(b)
+      setDemandPosts(d)
+    }).finally(() => setLoading(false))
   }, [user, token])
 
   const active = bookings.filter((b) => b.status !== 'completed')
@@ -42,8 +50,39 @@ export default function CustomerDashboard() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900">My Bookings</h1>
-      <p className="mt-1 text-sm text-gray-500">Welcome back{user ? `, ${user.name.split(' ')[0]}` : ''}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Bookings</h1>
+          <p className="mt-1 text-sm text-gray-500">Welcome back{user ? `, ${user.name.split(' ')[0]}` : ''}</p>
+        </div>
+        <Button as={Link} to="/post-requirement" variant="primary" size="sm">+ Post a Requirement</Button>
+      </div>
+
+      <section className="mt-8">
+        <h2 className="font-semibold text-gray-900">Your requirement posts</h2>
+        <p className="mt-1 text-xs text-gray-500">Owners bid on these blind — only you can see the offers.</p>
+        {!loading && demandPosts.length === 0 && (
+          <Card className="mt-3 p-6 text-center text-sm text-gray-500">
+            No requirements posted yet. Post one to get bids from vehicle owners.
+          </Card>
+        )}
+        <div className="mt-3 space-y-3">
+          {demandPosts.map((p) => (
+            <Card key={p.demandPostId} className="flex items-center justify-between p-4">
+              <div>
+                <p className="font-medium text-gray-900">{p.fromCity} → {p.toCity}</p>
+                <p className="text-sm text-gray-500">{p.preferredDate} · {p.bidCount} bid{p.bidCount === 1 ? '' : 's'}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge variant={postStatusVariant[p.status] || 'neutral'}>{p.status}</Badge>
+                <Button as={Link} to={`/requirements/${p.demandPostId}`} variant="outline" size="sm">
+                  {p.status === 'open' ? 'Review bids' : 'View'}
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
 
       <section className="mt-8">
         <h2 className="font-semibold text-gray-900">Active bookings</h2>

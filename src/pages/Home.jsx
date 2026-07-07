@@ -85,6 +85,21 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Bidding feature */}
+      <section className="bg-primary/5 py-16">
+        <div className="mx-auto max-w-6xl px-4 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 sm:text-3xl">Can't find a matching vehicle? Post what you need.</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-gray-600">
+            Tell us your route and date — vehicle owners bid for your trip. Bids are private to you, so owners
+            never see each other's offers, and you simply pick the best price.
+          </p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Button as={Link} to="/post-requirement" variant="primary" size="lg">Post a Requirement</Button>
+            <Button as={Link} to="/bid-board" variant="outline" size="lg">Vehicle Owner? Browse the Bid Board</Button>
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section className="mx-auto max-w-6xl px-4 py-16">
         <h2 className="text-center text-2xl font-bold text-gray-900 sm:text-3xl">How It Works</h2>

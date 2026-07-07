@@ -11,6 +11,9 @@ const TABLES = {
   VEHICLES: process.env.VEHICLES_TABLE,
   LISTINGS: process.env.LISTINGS_TABLE,
   BOOKINGS: process.env.BOOKINGS_TABLE,
+  DEMAND_POSTS: process.env.DEMAND_POSTS_TABLE,
+  BIDS: process.env.BIDS_TABLE,
+  CONNECTIONS: process.env.CONNECTIONS_TABLE,
 }
 
 module.exports = { ddb, TABLES }

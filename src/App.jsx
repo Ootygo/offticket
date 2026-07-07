@@ -8,6 +8,9 @@ import Booking from './pages/Booking'
 import BookingConfirmation from './pages/BookingConfirmation'
 import CustomerDashboard from './pages/customer/CustomerDashboard'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
+import PostRequirement from './pages/customer/PostRequirement'
+import RequestDetail from './pages/customer/RequestDetail'
+import BidBoard from './pages/owner/BidBoard'
 import About from './pages/About'
 import Login from './pages/Login'
 
@@ -24,6 +27,9 @@ export default function App() {
             <Route path="booking-confirmation/:bookingId" element={<BookingConfirmation />} />
             <Route path="dashboard" element={<CustomerDashboard />} />
             <Route path="owner/dashboard" element={<OwnerDashboard />} />
+            <Route path="post-requirement" element={<PostRequirement />} />
+            <Route path="requirements/:id" element={<RequestDetail />} />
+            <Route path="bid-board" element={<BidBoard />} />
             <Route path="about" element={<About />} />
             <Route path="login" element={<Login />} />
           </Route>

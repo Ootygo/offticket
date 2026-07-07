@@ -25,8 +25,13 @@ Globals:
         VEHICLES_TABLE: !Ref VehiclesTable
         LISTINGS_TABLE: !Ref ListingsTable
         BOOKINGS_TABLE: !Ref BookingsTable
+        DEMAND_POSTS_TABLE: !Ref DemandPostsTable
+        BIDS_TABLE: !Ref BidsTable
+        CONNECTIONS_TABLE: !Ref ConnectionsTable
         PHOTOS_BUCKET: !Ref VehiclePhotosBucket
         ALLOWED_ORIGIN: !Ref AllowedOrigin
+        CUSTOMER_USER_POOL_ID: !Ref CustomerUserPoolV2
+        OWNER_USER_POOL_ID: !Ref OwnerUserPoolV2
 
 Resources:
 
@@ -130,6 +135,114 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  DemandPostsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub offticket-demand-posts-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: demandPostId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: routeKey
+          AttributeType: S
+        - AttributeName: customerId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: demandPostId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: OpenPostsIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: RouteIndex
+          KeySchema:
+            - AttributeName: routeKey
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: CustomerPostsIndex
+          KeySchema:
+            - AttributeName: customerId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # Streams enabled so BroadcastBidUpdateFunction can push realtime updates
+  # the moment a bid is created or its status changes (accepted/rejected).
+  BidsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub offticket-bids-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      AttributeDefinitions:
+        - AttributeName: bidId
+          AttributeType: S
+        - AttributeName: demandPostId
+          AttributeType: S
+        - AttributeName: ownerId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: bidId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: DemandPostBidsIndex
+          KeySchema:
+            - AttributeName: demandPostId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: OwnerBidsIndex
+          KeySchema:
+            - AttributeName: ownerId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # WebSocket connections. demandPostId is sparse (unset until the client
+  # sends "subscribe"), so newly-connected-but-not-yet-subscribed clients
+  # simply don't show up in DemandPostConnectionsIndex yet.
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub offticket-connections-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+        - AttributeName: demandPostId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: DemandPostConnectionsIndex
+          KeySchema:
+            - AttributeName: demandPostId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
   ########################
   # S3 — vehicle photos & documents
   ########################
@@ -223,6 +336,102 @@ Resources:
               issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${OwnerUserPoolV2}
               audience: [!Ref OwnerUserPoolClientV2]
             IdentitySource: $request.header.Authorization
+
+  ########################
+  # WebSocket API — realtime bid updates
+  ########################
+
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub offticket-realtime-${Stage}
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  WebSocketConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
+
+  WebSocketConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Sub integrations/${WebSocketConnectIntegration}
+
+  WebSocketConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnConnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  WebSocketDisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
+
+  WebSocketDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Sub integrations/${WebSocketDisconnectIntegration}
+
+  WebSocketDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnDisconnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  WebSocketSubscribeIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnSubscribeFunction.Arn}/invocations
+
+  WebSocketSubscribeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: subscribe
+      AuthorizationType: NONE
+      Target: !Sub integrations/${WebSocketSubscribeIntegration}
+
+  WebSocketSubscribePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnSubscribeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  WebSocketDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - WebSocketConnectRoute
+      - WebSocketDisconnectRoute
+      - WebSocketSubscribeRoute
+    Properties:
+      ApiId: !Ref WebSocketApi
+
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      DeploymentId: !Ref WebSocketDeployment
+      StageName: !Ref Stage
 
   ########################
   # Lambda functions
@@ -373,10 +582,225 @@ Resources:
             Auth:
               Authorizer: OwnerAuthorizer
 
+  ########################
+  # Demand posts (customer requests) + blind bidding
+  ########################
+
+  CreateDemandPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/demandPosts/create.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref DemandPostsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /demand-posts
+            Method: POST
+            Auth:
+              Authorizer: CustomerAuthorizer
+
+  SearchDemandPostsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/demandPosts/search.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref DemandPostsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /demand-posts
+            Method: GET
+
+  GetDemandPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/demandPosts/getOne.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref DemandPostsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /demand-posts/{id}
+            Method: GET
+
+  CreateBidFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/bids/create.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref BidsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref DemandPostsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /demand-posts/{id}/bids
+            Method: POST
+            Auth:
+              Authorizer: OwnerAuthorizer
+
+  ListBidsForPostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/bids/listForPost.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref BidsTable }
+        - DynamoDBReadPolicy: { TableName: !Ref DemandPostsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /demand-posts/{id}/bids
+            Method: GET
+            Auth:
+              Authorizer: CustomerAuthorizer
+
+  GetMyBidFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/bids/getMine.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref BidsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /demand-posts/{id}/bids/mine
+            Method: GET
+            Auth:
+              Authorizer: OwnerAuthorizer
+
+  AcceptBidFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/bids/accept.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref BidsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref DemandPostsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref BookingsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /demand-posts/{id}/bids/{bidId}/accept
+            Method: PUT
+            Auth:
+              Authorizer: CustomerAuthorizer
+
+  GetUserDemandPostsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/users/getDemandPosts.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref DemandPostsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /users/{id}/demand-posts
+            Method: GET
+
+  GetUserPlacedBidsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/users/getPlacedBids.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref BidsTable }
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /users/{id}/placed-bids
+            Method: GET
+
+  ########################
+  # WebSocket realtime functions
+  ########################
+
+  OnConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/realtime/onConnect.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref ConnectionsTable }
+
+  OnDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/realtime/onDisconnect.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref ConnectionsTable }
+
+  OnSubscribeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/realtime/onSubscribe.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref ConnectionsTable }
+
+  BroadcastBidUpdateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/handlers/realtime/broadcastBidUpdate.handler
+      Timeout: 15
+      Environment:
+        Variables:
+          WEBSOCKET_ENDPOINT: !Sub https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref ConnectionsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ConnectionsTable }
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetRecords
+                - dynamodb:GetShardIterator
+                - dynamodb:DescribeStream
+                - dynamodb:ListStreams
+              Resource: !GetAtt BidsTable.StreamArn
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/${Stage}/POST/@connections/*
+      Events:
+        BidsStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt BidsTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 10
+
 Outputs:
   ApiUrl:
     Description: Base URL for the HTTP API
     Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+  WebSocketUrl:
+    Description: WebSocket URL for realtime bid updates (connect with ?token=<idToken>)
+    Value: !Sub wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
   CustomerUserPoolId:
     Value: !Ref CustomerUserPoolV2
   CustomerUserPoolClientId:

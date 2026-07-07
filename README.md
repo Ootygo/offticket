@@ -97,22 +97,24 @@ transform. Set `AllowedOrigin` to your real frontend URL once it's live
 instead of `*`.
 
 Either way, this provisions:
-- 4 DynamoDB tables (`Users`, `Vehicles`, `Listings`, `Bookings`) with the
-  GSIs needed for route search, "my listings", and "my bookings" queries
-- 9 Lambda functions behind an HTTP API (see table below)
+- 7 DynamoDB tables (`Users`, `Vehicles`, `Listings`, `Bookings`,
+  `DemandPosts`, `Bids`, `Connections`) with the GSIs needed for route
+  search, "my listings"/"my bookings" queries, and the bidding flow below
+- 22 Lambda functions behind an HTTP API + a WebSocket API (see tables below)
 - 2 Cognito User Pools (`offticket-customers-*`, `offticket-owners-*`) with
   email-based sign-in — Cognito sends verification codes via its own
   default email sender, no SNS/SES setup needed
 - An S3 bucket for vehicle photos, with presigned-upload support
 
-After deploy, copy the stack `Outputs` (`ApiUrl`, `CustomerUserPoolId`,
-`CustomerUserPoolClientId`, `OwnerUserPoolId`, `OwnerUserPoolClientId`) —
-via `aws cloudformation describe-stacks --stack-name offticket-backend-dev
---query "Stacks[0].Outputs"` — into the frontend's `.env` (copy
-`.env.example` to `.env` first):
+After deploy, copy the stack `Outputs` (`ApiUrl`, `WebSocketUrl`,
+`CustomerUserPoolId`, `CustomerUserPoolClientId`, `OwnerUserPoolId`,
+`OwnerUserPoolClientId`) — via `aws cloudformation describe-stacks
+--stack-name offticket-backend-dev --query "Stacks[0].Outputs"` — into the
+frontend's `.env` (copy `.env.example` to `.env` first):
 
 ```bash
 VITE_API_BASE_URL=<ApiUrl output>
+VITE_WS_URL=<WebSocketUrl output>
 VITE_CUSTOMER_USER_POOL_ID=<CustomerUserPoolId output>
 VITE_CUSTOMER_USER_POOL_CLIENT_ID=<CustomerUserPoolClientId output>
 VITE_OWNER_USER_POOL_ID=<OwnerUserPoolId output>
@@ -135,6 +137,30 @@ API and Cognito pools instead of mock data.
 | GET | `/users/{id}/listings` | none | an owner's listings |
 | GET | `/stats` | none | homepage "trips completed" counter |
 | POST | `/uploads/presign` | owner pool | get a presigned S3 URL for a vehicle photo |
+| POST | `/demand-posts` | customer pool | post a trip requirement for owners to bid on |
+| GET | `/demand-posts?from=&to=&status=` | none | browse open requirements (no bid data) |
+| GET | `/demand-posts/{id}` | none | fetch one requirement |
+| POST | `/demand-posts/{id}/bids` | owner pool | place a bid on a requirement |
+| GET | `/demand-posts/{id}/bids` | customer pool | **all** bids on a requirement — only the customer who posted it can call this |
+| GET | `/demand-posts/{id}/bids/mine` | owner pool | the caller's **own** bid on a requirement, never anyone else's |
+| PUT | `/demand-posts/{id}/bids/{bidId}/accept` | customer pool | accept a bid — rejects the rest, creates a confirmed booking |
+| GET | `/users/{id}/demand-posts` | none | a customer's own posted requirements |
+| GET | `/users/{id}/placed-bids` | none | an owner's own bid history |
+
+### WebSocket routes (realtime bid updates)
+
+| Route | Purpose |
+|-------|---------|
+| `$connect` | Verifies `?token=<idToken>` against both Cognito pools' JWKS to establish trusted identity for this connection (or none, if no/invalid token) |
+| `$disconnect` | Removes the connection record |
+| `subscribe` | Client sends `{ action: "subscribe", demandPostId }` to receive updates for one requirement |
+
+A DynamoDB Stream on the `Bids` table triggers `broadcastBidUpdate`, which
+pushes to subscribed connections. This is the realtime privacy boundary:
+only the connection belonging to the requirement's own customer gets full
+bid details; other owners' connections only get a content-free "activity"
+ping, or — if it's their own bid that changed status — a bare
+accepted/rejected notice with no price information about anyone else's bid.
 
 ## Deploying the frontend (AWS Amplify)
 
@@ -185,6 +211,31 @@ the deployed Amplify site) — the plugin also works in `npm run dev` via
 `devOptions.enabled: true`, but Chrome's install eligibility heuristics are
 more reliable against a production build.
 
+## Blind bidding ("Post a Requirement")
+
+Customers who can't find a matching listing can post what they need
+(route, date, goods/passenger details, optional budget hint) instead.
+Vehicle owners bid on it — blind: an owner never sees another owner's
+price, only their own bid's status. The customer sees every bid, live, and
+picks the best one; accepting immediately creates a confirmed booking
+(the owner already committed to that price by bidding, so there's no
+separate owner-confirmation step).
+
+- **Frontend**: `src/pages/customer/PostRequirement.jsx` (post a need),
+  `src/pages/customer/RequestDetail.jsx` (live bid review + accept),
+  `src/pages/owner/BidBoard.jsx` (browse + bid). `src/lib/realtime.js`
+  wraps the WebSocket connection, falling back to an in-memory pub/sub in
+  mock mode so the whole flow — including "live" updates — works standalone.
+- **Privacy enforcement happens twice**: once in the REST API
+  (`bids/listForPost.js` checks `post.customerId === callerId` before
+  returning anything), and once in the realtime layer (`broadcastBidUpdate`
+  only sends full bid content to the post's own customer connection).
+- **Realtime identity is never self-asserted** — `onConnect.js` verifies
+  the caller's Cognito ID token against the correct pool's JWKS
+  (`src/lib/verifyToken.js` in the backend) before recording who a
+  WebSocket connection belongs to; a client can't just claim to be a
+  particular owner or customer.
+
 ## Known limitations / next steps
 
 - **Payments**: the booking confirmation screen simulates a UPI payment.
@@ -196,3 +247,9 @@ more reliable against a production build.
   but swap for a DynamoDB counter (or a scheduled aggregation) before scale.
 - **e-pass / heavy-vehicle rules** are shown as informational banners
   linking to `epass.tnega.org` — there's no automated e-pass status check.
+- **Bids can't be edited or withdrawn** once placed — an owner who wants
+  to change their price has to wait for the customer to accept someone
+  else's (which rejects theirs) or for the post to close.
+- **No expiry** on demand posts — they stay `open` until the customer
+  accepts a bid; a scheduled Lambda to auto-close posts past their
+  `preferredDate` would be a natural follow-up.

@@ -224,4 +224,54 @@ export const mockBookings = [
   },
 ]
 
+// Demand posts — customers post an upcoming need, owners bid blind. Bids
+// are intentionally never joined onto the post object itself; they're a
+// separate list gated to the post's own customer, same as the real API.
+export const mockDemandPosts = [
+  {
+    demandPostId: 'dp-2001',
+    customerId: 'u-003',
+    customerName: 'Devi R',
+    fromCity: 'Coimbatore',
+    toCity: 'Ooty',
+    needType: 'goods',
+    goodsDetails: { description: 'Household shifting - furniture and boxes', weight: '1200' },
+    passengerCount: null,
+    preferredDate: '2026-07-10',
+    preferredTime: '09:00',
+    budgetHint: 3000,
+    status: 'open',
+    bidCount: 2,
+    awardedBidId: null,
+    createdAt: '2026-07-06T10:00:00Z',
+  },
+]
+
+export const mockBids = [
+  {
+    bidId: 'bid-3001',
+    demandPostId: 'dp-2001',
+    ownerId: 'u-001',
+    ownerName: 'Murugan S',
+    vehicleType: 'mini_truck',
+    registrationNumber: 'TN 38 AB 4521',
+    price: 2600,
+    message: 'Can do 9 AM pickup, have the space free.',
+    status: 'pending',
+    createdAt: '2026-07-06T11:00:00Z',
+  },
+  {
+    bidId: 'bid-3002',
+    demandPostId: 'dp-2001',
+    ownerId: 'u-002',
+    ownerName: 'Krishnan V',
+    vehicleType: 'truck',
+    registrationNumber: 'TN 43 CJ 9087',
+    price: 2450,
+    message: null,
+    status: 'pending',
+    createdAt: '2026-07-06T13:30:00Z',
+  },
+]
+
 export const RECENT_TRIPS_COUNT = 1284

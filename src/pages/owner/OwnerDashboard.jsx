@@ -3,16 +3,19 @@ import { Link } from 'react-router-dom'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import { getUserListings, getIncomingBookingsForOwner, confirmBooking } from '../../lib/api'
+import { getUserListings, getIncomingBookingsForOwner, confirmBooking, getUserPlacedBids } from '../../lib/api'
 import { VEHICLE_TYPES } from '../../data/mockData'
 import { useAuth } from '../../context/AuthContext'
 import { useRequireUser } from '../../hooks/useRequireUser'
+
+const bidStatusVariant = { pending: 'warning', accepted: 'success', rejected: 'neutral' }
 
 export default function OwnerDashboard() {
   const { token } = useAuth()
   const user = useRequireUser('owner')
   const [listings, setListings] = useState([])
   const [bookings, setBookings] = useState([])
+  const [placedBids, setPlacedBids] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,9 +23,11 @@ export default function OwnerDashboard() {
     Promise.all([
       getUserListings(user.userId, token),
       getIncomingBookingsForOwner(user.userId, token),
-    ]).then(([l, b]) => {
+      getUserPlacedBids(user.userId, token),
+    ]).then(([l, b, bids]) => {
       setListings(l)
       setBookings(b)
+      setPlacedBids(bids)
     }).finally(() => setLoading(false))
   }, [user, token])
 
@@ -46,7 +51,10 @@ export default function OwnerDashboard() {
           <h1 className="text-2xl font-bold text-gray-900">My Vehicles</h1>
           <p className="mt-1 text-sm text-gray-500">Welcome back{user ? `, ${user.name.split(' ')[0]}` : ''}</p>
         </div>
-        <Button as={Link} to="/list-vehicle" variant="primary" size="sm">+ List a vehicle</Button>
+        <div className="flex gap-2">
+          <Button as={Link} to="/bid-board" variant="outline" size="sm">Bid Board</Button>
+          <Button as={Link} to="/list-vehicle" variant="primary" size="sm">+ List a vehicle</Button>
+        </div>
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -59,6 +67,28 @@ export default function OwnerDashboard() {
           <p className="mt-1 text-2xl font-bold text-gray-900">{completed.length}</p>
         </Card>
       </div>
+
+      <section className="mt-8">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900">My bids on customer requests</h2>
+          <Button as={Link} to="/bid-board" variant="ghost" size="sm">Find requests to bid on</Button>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">You only ever see your own bids here — never what other owners offered.</p>
+        {!loading && placedBids.length === 0 && (
+          <Card className="mt-3 p-6 text-center text-sm text-gray-500">You haven't placed any bids yet.</Card>
+        )}
+        <div className="mt-3 space-y-3">
+          {placedBids.map((bid) => (
+            <Card key={bid.bidId} className="flex items-center justify-between p-4">
+              <div>
+                <p className="font-medium text-gray-900">₹{bid.price}</p>
+                {bid.message && <p className="text-sm text-gray-500">"{bid.message}"</p>}
+              </div>
+              <Badge variant={bidStatusVariant[bid.status] || 'neutral'}>{bid.status}</Badge>
+            </Card>
+          ))}
+        </div>
+      </section>
 
       <section className="mt-8">
         <h2 className="font-semibold text-gray-900">Incoming booking requests</h2>
