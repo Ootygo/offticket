@@ -1,12 +1,13 @@
 const { randomUUID } = require('crypto')
 const { PutCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok, fail } = require('../../lib/response')
+const { ok, fail, setRequestOrigin } = require('../../lib/response')
 const { getUserId } = require('../../lib/auth')
 const { correctCityName } = require('../../lib/format')
 
 // POST /listings (owner only — requires Cognito owner-pool token)
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const ownerId = getUserId(event)
   if (!ownerId) return fail('Unauthorized', 401)
 

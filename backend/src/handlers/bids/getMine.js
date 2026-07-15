@@ -1,11 +1,12 @@
 const { QueryCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok, fail } = require('../../lib/response')
+const { ok, fail, setRequestOrigin } = require('../../lib/response')
 const { getUserId } = require('../../lib/auth')
 
 // GET /demand-posts/{id}/bids/mine (owner only). Returns only the
 // requesting owner's own bid on this post (or null) — never anyone else's.
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const ownerId = getUserId(event)
   if (!ownerId) return fail('Unauthorized', 401)
 

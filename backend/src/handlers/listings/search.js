@@ -1,10 +1,11 @@
 const { QueryCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok, fail } = require('../../lib/response')
+const { ok, fail, setRequestOrigin } = require('../../lib/response')
 const { correctCityName } = require('../../lib/format')
 
 // GET /listings?from=&to=&date=&type=
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const { from, to, date, type } = event.queryStringParameters || {}
   if (!from || !to) return fail('from and to query params are required')
 

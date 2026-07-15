@@ -1,6 +1,6 @@
 const { GetCommand, UpdateCommand, PutCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok, fail } = require('../../lib/response')
+const { ok, fail, setRequestOrigin } = require('../../lib/response')
 const { getUserId } = require('../../lib/auth')
 
 function generateBookingId() {
@@ -15,6 +15,7 @@ function generateBookingId() {
 // owner committed to this price by bidding, so there's no separate
 // owner-confirmation step like the listing-based booking flow has.
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const customerId = getUserId(event)
   if (!customerId) return fail('Unauthorized', 401)
 

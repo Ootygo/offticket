@@ -1,13 +1,14 @@
 const { randomUUID } = require('crypto')
 const { GetCommand, PutCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok, fail } = require('../../lib/response')
+const { ok, fail, setRequestOrigin } = require('../../lib/response')
 const { getUserId, getClaims } = require('../../lib/auth')
 
 // POST /demand-posts/{id}/bids (owner only). Deliberately does not return
 // or expose any other bid on this post — an owner only ever gets back
 // their own bid they just placed.
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const ownerId = getUserId(event)
   if (!ownerId) return fail('Unauthorized', 401)
   const claims = getClaims(event)

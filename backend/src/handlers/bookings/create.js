@@ -1,7 +1,7 @@
 const { randomUUID } = require('crypto')
 const { GetCommand, PutCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok, fail } = require('../../lib/response')
+const { ok, fail, setRequestOrigin } = require('../../lib/response')
 const { getUserId } = require('../../lib/auth')
 
 function generateBookingId() {
@@ -12,6 +12,7 @@ function generateBookingId() {
 
 // POST /bookings (customer only — requires Cognito customer-pool token)
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const customerId = getUserId(event)
   if (!customerId) return fail('Unauthorized', 401)
 

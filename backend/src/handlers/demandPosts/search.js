@@ -1,6 +1,6 @@
 const { QueryCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok } = require('../../lib/response')
+const { ok, setRequestOrigin } = require('../../lib/response')
 const { correctCityName } = require('../../lib/format')
 
 // GET /demand-posts?from=&to=&status= — public browse for vehicle owners
@@ -8,6 +8,7 @@ const { correctCityName } = require('../../lib/format')
 // the post itself and a bare bidCount, so there is nothing for one owner
 // to learn about another owner's bid from this endpoint.
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const { from, to, status } = event.queryStringParameters || {}
   const wantedStatus = status || 'open'
 

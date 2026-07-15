@@ -5,9 +5,14 @@ Description: >
   Cognito (separate customer/owner pools) + S3 for vehicle photos.
 
 Parameters:
-  AllowedOrigin:
-    Type: String
-    Description: CORS origin for the frontend (e.g. https://main.xxxxx.amplifyapp.com)
+  AllowedOrigins:
+    Type: CommaDelimitedList
+    Description: >-
+      CORS origins for the frontend, comma-separated with no spaces (e.g.
+      https://offticket.in,https://www.offticket.in,https://main.xxxxx.amplifyapp.com).
+      Access-Control-Allow-Origin can only ever echo back one exact origin,
+      so the Lambda responses (see src/lib/response.js) pick whichever of
+      these actually matches the incoming request.
     Default: "*"
   Stage:
     Type: String
@@ -29,7 +34,7 @@ Globals:
         BIDS_TABLE: !Ref BidsTable
         CONNECTIONS_TABLE: !Ref ConnectionsTable
         PHOTOS_BUCKET: !Ref VehiclePhotosBucket
-        ALLOWED_ORIGIN: !Ref AllowedOrigin
+        ALLOWED_ORIGINS: !Join [',', !Ref AllowedOrigins]
         CUSTOMER_USER_POOL_ID: !Ref CustomerUserPoolV2
         OWNER_USER_POOL_ID: !Ref OwnerUserPoolV2
 
@@ -253,7 +258,7 @@ Resources:
       BucketName: !Sub offticket-vehicle-photos-${Stage}-${AWS::AccountId}
       CorsConfiguration:
         CorsRules:
-          - AllowedOrigins: [!Ref AllowedOrigin]
+          - AllowedOrigins: !Ref AllowedOrigins
             AllowedMethods: [GET, PUT]
             AllowedHeaders: ['*']
             MaxAge: 3000
@@ -321,7 +326,7 @@ Resources:
     Properties:
       StageName: !Ref Stage
       CorsConfiguration:
-        AllowOrigins: [!Ref AllowedOrigin]
+        AllowOrigins: !Ref AllowedOrigins
         AllowHeaders: [Content-Type, Authorization]
         AllowMethods: [GET, POST, PUT, OPTIONS]
       Auth:

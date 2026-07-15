@@ -1,6 +1,6 @@
 const { GetCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok, fail } = require('../../lib/response')
+const { ok, fail, setRequestOrigin } = require('../../lib/response')
 const { getUserId } = require('../../lib/auth')
 
 // GET /demand-posts/{id}/bids (customer only). This is the core privacy
@@ -8,6 +8,7 @@ const { getUserId } = require('../../lib/auth')
 // request can ever see the list of bids on it. Vehicle owners never get
 // this — see bids/getMine.js for what an owner is allowed to see instead.
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const customerId = getUserId(event)
   if (!customerId) return fail('Unauthorized', 401)
 

@@ -1,9 +1,10 @@
 const { QueryCommand } = require('@aws-sdk/lib-dynamodb')
 const { ddb, TABLES } = require('../../lib/dynamodb')
-const { ok } = require('../../lib/response')
+const { ok, setRequestOrigin } = require('../../lib/response')
 
 // GET /users/{id}/demand-posts — a customer's own posted requirements.
 exports.handler = async (event) => {
+  setRequestOrigin(event)
   const customerId = event.pathParameters?.id
   const result = await ddb.send(new QueryCommand({
     TableName: TABLES.DEMAND_POSTS,
